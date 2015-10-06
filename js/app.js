@@ -26,59 +26,90 @@
     }
 }());
 
-
-/* STUDENT APPLICATION */
-$(function() {
-    var attendance = JSON.parse(localStorage.attendance),
-        $allMissed = $('tbody .missed-col'),
-        $allCheckboxes = $('tbody input');
-
-    // Count a student's missed days
-    function countMissing() {
-        $allMissed.each(function() {
-            var studentRow = $(this).parent('tr'),
-                dayChecks = $(studentRow).children('td').children('input'),
-                numMissed = 0;
-
-            dayChecks.each(function() {
-                if (!$(this).prop('checked')) {
-                    numMissed++;
-                }
-            });
-
-            $(this).text(numMissed);
-        });
+/* MODEL */
+var model = {
+    Init : function() {
+        model.attendance = JSON.parse(localStorage.attendance);
+        model.missed = [];
     }
+};
 
-    // Check boxes, based on attendace records
-    $.each(attendance, function(name, days) {
-        var studentRow = $('tbody .name-col:contains("' + name + '")').parent('tr'),
-            dayChecks = $(studentRow).children('.attend-col').children('input');
-
-        dayChecks.each(function(i) {
-            $(this).prop('checked', days[i]);
+/* VIEW */
+var view = {
+    Init : function() {
+        view.$allMissed = $('tbody .missed-col');
+        view.$allCheckboxes = $('tbody input');
+        view.AddCheckboxListener();
+    },
+    UpdateMissing : function() {
+        var missing = octopus.GetMissing();
+        var count = 0;
+        view.$allMissed.each(function () {
+            $(this).text(missing[count]);
+            count = count + 1;
         });
-    });
+    },
+    UpdateCheckbox : function() {
+        var checkbox = octopus.GetCheckbox();
+        var count = 0;
+        view.$allCheckboxes.each(function() {
+            $(this).prop('checked', checkbox[count]);
+            count = count + 1;
+        })
+    },
+    AddCheckboxListener : function() {
+        view.$allCheckboxes.on('click', function() {octopus.UpdateAttendance(event);});
+    }
+}
 
-    // When a checkbox is clicked, update localStorage
-    $allCheckboxes.on('click', function() {
-        var studentRows = $('tbody .student'),
-            newAttendance = {};
-
-        studentRows.each(function() {
-            var name = $(this).children('.name-col').text(),
-                $allCheckboxes = $(this).children('td').children('input');
-
-            newAttendance[name] = [];
-
-            $allCheckboxes.each(function() {
-                newAttendance[name].push($(this).prop('checked'));
-            });
+/* OCTOPUS */
+var octopus = {
+    Init : function() {
+        model.Init();
+        view.Init();
+        octopus.ShowCheckbox();
+        octopus.ShowMissing();
+    },
+    GetMissing : function () {
+        var count = 0
+        $.each(model.attendance, function(key, value) {
+            var missCount = 0;
+            for (var i = 0; i < value.length; i = i + 1) {
+                if (value[i] === false) {
+                    missCount = missCount + 1;
+                }
+            }
+            model.missed[count] = missCount;
+            count = count + 1;
         });
+        return model.missed;
+    },
+    GetCheckbox : function () {
+        var checkbox = [];
+        var count = 0;
+        $.each(model.attendance, function(key, value) {
+            for (var i = 0; i < value.length; i = i + 1) {
+                checkbox[count+i] = value[i];
+            }
+            count = count + value.length;
+        });
+        return checkbox;
+    },
+    ShowMissing : function() {
+        view.UpdateMissing();
+    },
+    ShowCheckbox : function() {
+        view.UpdateCheckbox();
+    },
+    UpdateAttendance : function(event) {
+        var checkboxName = $(event.target).parent().parent().children('.name-col').text();
+        var checkboxCol = $(event.target).parent().index() - 1;
+        model.attendance[checkboxName][checkboxCol] = $(event.target).prop('checked');
+        localStorage.attendance = JSON.stringify(model.attendance);
 
-        countMissing();
-        localStorage.attendance = JSON.stringify(newAttendance);
-    });
+        octopus.ShowCheckbox();
+        octopus.ShowMissing();
+    }
+};
 
-    countMissing();
-}());
+octopus.Init();
